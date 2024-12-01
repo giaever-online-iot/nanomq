@@ -1,12 +1,9 @@
 #!/usr/bin/env bash
 
-export SNAP="${SNAP:-"$(pwd)/test/SNAP"}"
-export SNAP_DATA="${SNAP_DATA:-"$(pwd)/test/SNAP_DATA"}"
-#export NANOMQ="${SNAP_DATA}/nanomq.conf"
-export VIM="${VIM:-"${SNAP_DATA}/vimrc"}"
+export VIM="${VIM:-"$(pwd)/test/SNAP/vimrc"}"
 export SNAP_UID="${SNAP_UID:-0}"
 
-. $SNAP/helpers/functions
+. "${SNAP:-"$(pwd)/src"}/helpers/functions"
 
 ensure_root
 
@@ -30,11 +27,13 @@ function print_conf_opts {
 }
 
 I=0
-RWD="${SNAP_DATA}"
-ROD="${SNAP}"
+RWD="$(dirname "${NANOMQ_CONF:-"$(pwd)/test/SNAP_DATA/nanomq.conf"}")"
+ROD="${SNAP:-"$(pwd)/test/SNAP"}"
+ARGS="$([ -a "${NANOMQ_CONF}" ] && echo "${@}" || echo "${@:-"*"}")"
 
-CONF_RW=( $(search_conf "${RWD}" "/" "$@") )
-CONF_RO=( $(search_conf "${ROD}" "usr/local/etc/" "$@") )
+#set -x
+CONF_RW=( $(search_conf "${RWD}" "/" "${ARGS}") )
+CONF_RO=( $(search_conf "${ROD}" "usr/local/etc/" "${ARGS}"))
 CONFS=( ${CONF_RW[@]} ${CONF_RO[@]} )
 
 if [ "${#CONF_RW[@]}" -ne 0 ]; then
@@ -53,9 +52,11 @@ while : ; do
 		((CONF_NO--))
 		CONF="${CONFS[$CONF_NO]}"
 		if [ ! -w "${CONF}" ]; then
-			set -x
-			cp -i "${CONF}" "${RWD}"
-			CONF="${RWD}/$(basename "${CONF}")"
+			FN="$(basename "${CONF}")"
+			FN="${FN#nanomq_}" 
+			CONF_RW="${RWD}/$([ "${FN}" == ".conf" -o "${FN}" == "old.conf" -o "${FN}" == "example.conf" ] && echo "$(basename "${NANOMQ_CONF:-"nanomq.conf"}")" || echo "$(basename "${CONF}")")"
+			cp -i "${CONF}" "${CONF_RW}"
+			CONF="${CONF_RW}"
 		fi
 		edit "${CONF}"
 	else

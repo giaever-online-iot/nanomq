@@ -1,7 +1,7 @@
 name: nanomq
 base: core24
 version: 0.22.10
-summary: All-around Edge Messaging Platform
+summary: All-around Edge Messaging Platform with a MQTT Broker and a Message Bus
 description: |
   NanoMQ MQTT Broker (NanoMQ) is an all-around Edge Messaging Platform
   that includes a blazing-fast MQTT Broker for the IoT/IIoT and a
@@ -20,11 +20,11 @@ confinement: strict # use 'strict' once you have the right plugs and slots
 source-code: https://github.com/nanomq/nanomq.git
 license: MIT
 environment:
-  NANOMQ: $SNAP_DATA/nanomq.conf
+  NANOMQ_CONF: $SNAP_DATA/nanomq.conf
   VIM: $SNAP/etc/vim/vimrc
 apps:
   nanomq:
-    command: usr/local/bin/nanomq start --conf $NANOMQ
+    command: usr/local/bin/nanomq start --conf $NANOMQ_CONF
     command-chain:
       - wrappers/daemon
     daemon: simple
@@ -42,8 +42,8 @@ apps:
     plugs:
       - network
       - network-bind
-  edit:
-    command: bin/vi
+  conf:
+    command: bin/conf
 layout:
   /etc/vim/vimrc:
     bind-file: $SNAP/etc/vim/vimrc
@@ -52,7 +52,7 @@ layout:
 parts:
   nanomq:
     plugin: cmake
-    source: https://github.com/nanomq/nanomq.git
+    source: nanomq/0.22.10
     build-packages:
       - libmysqlclient-dev
       - pkg-config
@@ -68,7 +68,6 @@ parts:
       - -DNNG_ENABLE_TLS=ON # Builds NanoMQ with TLS support. Requires [mbedtls](https://github.com/Mbed-TLS/mbedtls).
     stage-packages:
       - libmysqlclient21
-    source-tag: $SNAPCRAFT_PROJECT_VERSION
   local:
     plugin: dump
     source: ./src
