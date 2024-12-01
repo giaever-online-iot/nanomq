@@ -19,8 +19,6 @@ grade: stable # must be 'stable' to release into candidate/stable channels
 confinement: strict # use 'strict' once you have the right plugs and slots
 source-code: https://github.com/nanomq/nanomq.git
 license: MIT
-assumes:
-  - command-chain
 environment:
   NANOMQ: $SNAP_DATA/nanomq.conf
   VIM: $SNAP/etc/vim/vimrc

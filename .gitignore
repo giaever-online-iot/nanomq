@@ -1,3 +1,4 @@
 nanomq/*
 nanomq_*.snap
 test/
+snap/snapcraft.yaml.bup
