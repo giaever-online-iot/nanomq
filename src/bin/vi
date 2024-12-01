@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+
+export SNAP="${SNAP:-"$(pwd)/test/SNAP"}"
+export SNAP_DATA="${SNAP_DATA:-"$(pwd)/test/SNAP_DATA"}"
+#export NANOMQ="${SNAP_DATA}/nanomq.conf"
+export VIM="${VIM:-"${SNAP_DATA}/vimrc"}"
+export SNAP_UID="${SNAP_UID:-0}"
+
+. $SNAP/helpers/functions
+
+ensure_root
+
+if [ ! -a "${VIM}" -o ! -s "${VIM}" ]; then 
+	logp "Creating: ${VIM}"
+	echo -e "set nocompatible\nset number\nset tabstop=4\nset autoindent" > $VIM
+fi
+
+function edit {
+	if [ -a "${1}" ]; then
+		/usr/bin/vi -u "${VIM}" "${1}" && exit $?
+	fi
+	exit 1
+}
+
+function print_conf_opts {
+	for CONF in $@; do
+		((I++))
+		echo -e " $I:\t$(basename "$CONF")"
+	done
+}
+
+I=0
+RWD="${SNAP_DATA}"
+ROD="${SNAP}"
+
+CONF_RW=( $(search_conf "${RWD}" "/" "$@") )
+CONF_RO=( $(search_conf "${ROD}" "usr/local/etc/" "$@") )
+CONFS=( ${CONF_RW[@]} ${CONF_RO[@]} )
+
+if [ "${#CONF_RW[@]}" -ne 0 ]; then
+	echo -e "\nEdit an existing configuration"
+	print_conf_opts ${CONF_RW[@]}
+fi
+
+echo -e "\nCopy and edit an example"
+print_conf_opts ${CONF_RO[@]}
+
+while : ; do 
+	echo ""
+	read -p "Choose [1 - ${#CONFS[@]}]: " CONF_NO
+
+	if [ "${CONF_NO:-0}" -gt 0 -a "${CONF_NO:-0}" -le "${#CONFS[@]}" ]; then
+		((CONF_NO--))
+		CONF="${CONFS[$CONF_NO]}"
+		if [ ! -w "${CONF}" ]; then
+			set -x
+			cp -i "${CONF}" "${RWD}"
+			CONF="${RWD}/$(basename "${CONF}")"
+		fi
+		edit "${CONF}"
+	else
+		echo "Unknown option: ${CONF_NO:-empty}"
+
+	fi
+done
+
+exit $?
+
+#/usr/bin/vi -u $VIM $@

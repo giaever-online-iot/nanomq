@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+
+function logp {
+	logger $@ && echo -e $@
+}
+
+function ensure_root {
+	[ "${SNAP_UID}" -ne 0 ] && logp "You must be <sud>(root)" && exit 1
+}
+
+function path {
+	echo "$1/$2" | sed -E 's#\/{2,}|[.\/]{2,}#\/#gm;t'
+}
+
+function fn {
+	echo "nanomq$([ "$#" -eq 1 -a "${1}" = "*" ] && echo "*" || (C="${@:+_}${@}" && echo "${C// /_}") ).conf"
+}
+
+function search_conf {
+	find "$(path "${1}" "${2}")" -type f -name "$(fn "${@:3}")" 
+}
