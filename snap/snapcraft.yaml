@@ -40,8 +40,8 @@ apps:
   conf:
     command: bin/conf
 layout:
-  #/usr/bin/vi:
-  #  bind: $SNAP/usr/bin/vi
+  /usr/bin/vi:
+    symlink: $SNAP/usr/bin/vim.tiny
   /etc/vim/vimrc:
     bind-file: $SNAP/etc/vim/vimrc
   /etc/certs:
