@@ -14,7 +14,7 @@ fi
 
 function edit {
 	if [ -a "${1}" ]; then
-		/usr/bin/vi -u "${VIM}" "${1}" && exit $?
+		/usr/bin/vim.tiny -u "${VIM}" "${1}" && exit $?
 	fi
 	exit 1
 }

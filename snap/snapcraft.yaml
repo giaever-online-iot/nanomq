@@ -19,6 +19,12 @@ grade: stable # must be 'stable' to release into candidate/stable channels
 confinement: strict # use 'strict' once you have the right plugs and slots
 source-code: https://github.com/nanomq/nanomq.git
 license: MIT
+platforms:
+  amd64:
+  # arm64:
+  # ppc64el:
+  # s390x:
+  # riscv64:
 environment:
   NANOMQ_CONF: "$SNAP_DATA/nanomq.conf"
   VIM: $SNAP/etc/vim/vimrc
@@ -40,8 +46,8 @@ apps:
   conf:
     command: bin/conf
 layout:
-  /usr/bin/vi:
-    symlink: $SNAP/usr/bin/vim.tiny
+  #/usr/bin/vi:
+  #  symlink: $SNAP/usr/bin/vim.tiny
   /etc/vim/vimrc:
     bind-file: $SNAP/etc/vim/vimrc
   /etc/certs:
