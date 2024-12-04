@@ -2,9 +2,10 @@
 
 . $SNAP/helpers/functions
 
-logp "Start daemon"
-if [ ! -f "${NANOMQ}" ]; then
-	logp "File: ${NANOMQ} does not exist. Please create it with: $ sudo ${SNAP_INSTANCE_NAME}.edit"
+ensure_root
+
+if [ ! -r "${NANOMQ_CONF}" ]; then
+	logp "File: ${NANOMQ_CONF} does not exist. Create it with: $ sudo ${SNAP_INSTANCE_NAME}.conf"
 	exit 1
 fi
 
