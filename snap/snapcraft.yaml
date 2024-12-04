@@ -53,7 +53,7 @@ layout:
 parts:
   nanomq:
     plugin: cmake
-    source: nanomq/0.22.10
+    source: https://github.com/nanomq/nanomq.git
     build-packages:
       - libmysqlclient-dev
       - pkg-config
@@ -69,6 +69,7 @@ parts:
       - -DNNG_ENABLE_TLS=ON # Builds NanoMQ with TLS support. Requires [mbedtls](https://github.com/Mbed-TLS/mbedtls).
     stage-packages:
       - libmysqlclient21
+    source-tag: $SNAPCRAFT_PROJECT_VERSION
   local:
     plugin: dump
     source: ./src
