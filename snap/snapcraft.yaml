@@ -21,10 +21,10 @@ source-code: https://github.com/nanomq/nanomq.git
 license: MIT
 platforms:
   amd64:
-  # arm64:
-  # ppc64el:
-  # s390x:
-  # riscv64:
+  arm64:
+  ppc64el:
+  s390x:
+  riscv64:
 environment:
   NANOMQ_CONF: "$SNAP_DATA/nanomq.conf"
   VIM: $SNAP/etc/vim/vimrc
