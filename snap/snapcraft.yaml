@@ -47,7 +47,7 @@ apps:
     command: bin/conf
 layout:
   /usr/bin/vi:
-    symlink: $SNAP/usr/bin/vim.tiny
+    bind-file: $SNAP/usr/bin/vim.tiny
   /usr/bin/vim.tiny:
     symlink: $SNAP/usr/bin/vim.tiny
   /etc/vim/vimrc:
