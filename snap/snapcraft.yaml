@@ -1,4 +1,5 @@
 name: nanomq
+title: NanoMQ
 base: core24
 version: 0.22.10
 summary: All-around Edge Messaging Platform with a MQTT Broker and a Message Bus
@@ -17,11 +18,13 @@ description: |
   For more information, please visit [NanoMQ homepage](https://nanomq.io/)
 grade: stable # must be 'stable' to release into candidate/stable channels
 confinement: strict # use 'strict' once you have the right plugs and slots
-source-code: https://github.com/nanomq/nanomq.git
+website: https://nanomq.io/
+source-code: https://github.com/giaever-online-iot/nanomq
 license: MIT
 platforms:
   amd64:
   arm64:
+  armhf:
   ppc64el:
   s390x:
   riscv64:
