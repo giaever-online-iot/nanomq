@@ -16,7 +16,7 @@ function edit {
 	if [ -a "${1}" ]; then
 		$SNAP/usr/bin/vim.tiny -u "${VIM}" "${1}" && snapctl restart "${SNAP_INSTANCE_NAME}.${SNAP_NAME}" && exit $?
 	fi
-	return $?
+	exit $?
 }
 
 function print_conf_opts {
