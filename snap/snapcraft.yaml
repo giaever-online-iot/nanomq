@@ -1,7 +1,7 @@
 name: nanomq
 title: NanoMQ
 base: core24
-version: 0.22.10
+version: 0.23.1
 summary: All-around Edge Messaging Platform with a MQTT Broker and a Message Bus
 description: |
   NanoMQ MQTT Broker (NanoMQ) is an all-around Edge Messaging Platform
@@ -58,18 +58,20 @@ parts:
     plugin: cmake
     source: https://github.com/nanomq/nanomq.git
     build-packages:
-      - libmysqlclient-dev
+      - libmbedtls-dev
+      - libatomic1
+      #- libmysqlclient-dev
       - pkg-config
     cmake-generator: Ninja
     cmake-parameters:
       - -DNNG_ENABLE_TLS=ON # Builds NanoMQ with TLS support. Requires [mbedtls](https://github.com/Mbed-TLS/mbedtls).
       - -DNNG_ENABLE_SQLITE=ON # Builds with SQLite support. Default is OFF.
       #- -DDEBUG=ON # Enables the debug flag. Default is OFF.
-      #- -DENABLE_ACL=ON # Enable ACL.
+      - -DENABLE_ACL=ON # Enable ACL.
       #- -DENABLE_JWT=ON # Builds JWT dependency for the HTTP server. Default is OFF.
       #- -DENABLE_MYSQL=ON # Enable MySQL. Requires=libmysqlclient-dev. Default is OFF.
-      #- -DENABLE_RULE_ENGINE=ON # Enable rule engine. Default is OFF.
-      #- -DENABLE_SYSLOG=NO # Enable syslog.
+      - -DENABLE_RULE_ENGINE=ON # Enable rule engine. Default is OFF.
+      - -DENABLE_SYSLOG=NO # Enable syslog.
     stage-packages:
       - libmysqlclient21
     source-tag: $SNAPCRAFT_PROJECT_VERSION
