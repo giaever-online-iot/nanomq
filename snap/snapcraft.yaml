@@ -62,14 +62,14 @@ parts:
       - pkg-config
     cmake-generator: Ninja
     cmake-parameters:
-      #- -DDEBUG=ON # Enables the debug flag. Default is OFF.
-      - -DENABLE_ACL=ON # Enable ACL.
-      - -DENABLE_JWT=ON # Builds JWT dependency for the HTTP server. Default is OFF.
-      - -DENABLE_MYSQL=ON # Enable MySQL. Requires=libmysqlclient-dev. Default is OFF.
-      - -DENABLE_RULE_ENGINE=ON # Enable rule engine. Default is OFF.
-      - -DENABLE_SYSLOG=NO # Enable syslog.
-      - -DNNG_ENABLE_SQLITE=ON # Builds with SQLite support. Default is OFF.
       - -DNNG_ENABLE_TLS=ON # Builds NanoMQ with TLS support. Requires [mbedtls](https://github.com/Mbed-TLS/mbedtls).
+      - -DNNG_ENABLE_SQLITE=ON # Builds with SQLite support. Default is OFF.
+      #- -DDEBUG=ON # Enables the debug flag. Default is OFF.
+      #- -DENABLE_ACL=ON # Enable ACL.
+      #- -DENABLE_JWT=ON # Builds JWT dependency for the HTTP server. Default is OFF.
+      #- -DENABLE_MYSQL=ON # Enable MySQL. Requires=libmysqlclient-dev. Default is OFF.
+      #- -DENABLE_RULE_ENGINE=ON # Enable rule engine. Default is OFF.
+      #- -DENABLE_SYSLOG=NO # Enable syslog.
     stage-packages:
       - libmysqlclient21
     source-tag: $SNAPCRAFT_PROJECT_VERSION
