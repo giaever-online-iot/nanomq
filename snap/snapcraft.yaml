@@ -50,7 +50,7 @@ apps:
     command: bin/conf
 layout:
   /etc/vim/vimrc:
-    bind-file: $SNAP/etc/vim/vimrc
+    symlink: $SNAP/etc/vim/vimrc
   /etc/certs:
     symlink: $SNAP/usr/local/etc/certs
 parts:
