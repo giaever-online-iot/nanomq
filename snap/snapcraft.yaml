@@ -30,7 +30,7 @@ platforms:
   riscv64:
 environment:
   NANOMQ_CONF: "$SNAP_DATA/nanomq.conf"
-  VIM: $SNAP/etc/vim/vimrc
+  VIM: $SNAP_COMMON/vimrc
 apps:
   nanomq:
     command: usr/local/bin/nanomq start --conf $NANOMQ_CONF
@@ -50,7 +50,7 @@ apps:
     command: bin/conf
 layout:
   /etc/vim/vimrc:
-    symlink: $SNAP/etc/vim/vimrc
+    bind-file: $SNAP_COMMON/vimrc
   /etc/certs:
     symlink: $SNAP/usr/local/etc/certs
 parts:
