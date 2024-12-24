@@ -73,7 +73,9 @@ parts:
       - -DENABLE_RULE_ENGINE=ON # Enable rule engine. Default is OFF.
       - -DENABLE_SYSLOG=NO # Enable syslog.
     stage-packages:
-      - libmysqlclient21
+      #- libmbedtls-dev
+      - libmbedtls14t64
+      #- libmysqlclient21
     source-tag: $SNAPCRAFT_PROJECT_VERSION
   local:
     plugin: dump
