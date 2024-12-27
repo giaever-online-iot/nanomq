@@ -6,6 +6,7 @@ export SNAP_UID="${SNAP_UID:-0}"
 . "${SNAP:-"$(pwd)/src"}/helpers/functions"
 
 ensure_root
+cd $SNAP
 
 if [ ! -a "${VIM}" -o ! -s "${VIM}" ]; then 
 	logp "Creating: ${VIM}"
