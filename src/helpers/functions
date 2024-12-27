@@ -17,6 +17,5 @@ function fn {
 }
 
 function search_conf {
-	path "${1}" "${2}"
 	find "$(path "${1}" "${2}")" -type f -name "$(fn "${@:3}")" 
 }

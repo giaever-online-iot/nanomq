@@ -1,4 +1,4 @@
-#!/usr/bin/env bash -x
+#!/usr/bin/env bash
 
 export VIM="${VIM:-"$(pwd)/test/SNAP/vimrc"}"
 export SNAP_UID="${SNAP_UID:-0}"
@@ -14,7 +14,7 @@ fi
 
 function edit {
 	if [ -a "${1}" ]; then
-		$SNAP/usr/bin/vim.tiny -u "${VIM}" "${1}" && snapctl restart "${SNAP_INSTANCE_NAME}.${SNAP_NAME}" && exit $?
+		$SNAP/usr/bin/vim.tiny -u "${VIM}" "${1}" && echo "Restarting ${SNAP_INSTANCE_NAME}" && snapctl restart "${SNAP_INSTANCE_NAME}.${SNAP_NAME}" && exit $?
 	fi
 	exit $?
 }
@@ -31,9 +31,10 @@ RWD="$(dirname "${NANOMQ_CONF:-"$(pwd)/test/SNAP_DATA/nanomq.conf"}")"
 ROD="${SNAP:-"$(pwd)/test/SNAP"}"
 ARGS="$([ -a "${NANOMQ_CONF}" ] && echo "${@}" || echo "${@:-"*"}")"
 
-#set -x
+set -x
 CONF_RW=( $(search_conf "${RWD}" "/" "${ARGS}") )
 CONF_RO=( $(search_conf "${ROD}" "usr/local/etc/" "${ARGS}"))
+set +x
 CONFS=( ${CONF_RW[@]} ${CONF_RO[@]} )
 
 if [ "${#CONF_RW[@]}" -ne 0 ]; then
