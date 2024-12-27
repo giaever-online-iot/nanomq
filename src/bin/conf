@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/env bash -x
 
 export VIM="${VIM:-"$(pwd)/test/SNAP/vimrc"}"
 export SNAP_UID="${SNAP_UID:-0}"
