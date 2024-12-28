@@ -32,10 +32,10 @@ RWD="$(dirname "${NANOMQ_CONF:-"$(pwd)/test/SNAP_DATA/nanomq.conf"}")"
 ROD="${SNAP:-"$(pwd)/test/SNAP"}"
 ARGS="$([ -a "${NANOMQ_CONF}" ] && echo "${@}" || echo "${@:-"*"}")"
 
-set -x
+#set -x
 CONF_RW=( $(search_conf "${RWD}" "/" "${ARGS}") )
 CONF_RO=( $(search_conf "${ROD}" "usr/local/etc/" "${ARGS}"))
-set +x
+#set +x
 CONFS=( ${CONF_RW[@]} ${CONF_RO[@]} )
 
 if [ "${#CONF_RW[@]}" -ne 0 ]; then
