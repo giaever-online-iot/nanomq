@@ -23,13 +23,22 @@ One-time setup: `make init-snap-env` (installs snapcraft, logs into snap store).
 
 **Gotcha:** `local-source`/`remote-source` edit `snap/snapcraft.yaml` in place via `yq`. The committed state must be the *remote* state (GitHub URL + `source-tag`). After `make build-local`, run `make remote-source` before committing, or you will commit a machine-local source path.
 
-There is no automated test suite. The gitignored `test/SNAP` and `test/SNAP_DATA` trees mock the snap runtime so `src/bin/conf` can be run directly from the repo root outside confinement — the script falls back to `$(pwd)/src` for `$SNAP`, `$(pwd)/test/SNAP_DATA/nanomq.conf` for `$NANOMQ_CONF`, and `SNAP_UID=0`, so `./src/bin/conf` exercises the menu/copy/edit flow locally.
+Tests and lint (all plain bash, no framework — same harness style as the CI):
+
+```bash
+bash tests/functions_test.sh            # characterization tests for src/helpers/functions
+bash tests/snapcraft_state_test.sh      # guards committed snapcraft.yaml against local-source state
+for t in .github/scripts/*.test.sh; do bash "$t"; done   # CI helper unit tests
+shellcheck --severity=warning -x src/bin/* src/wrappers/* src/helpers/* tests/*.sh
+```
+
+Note the naming split: `tests/` (plural) is the tracked test suite; the gitignored `test/` (singular) `SNAP`/`SNAP_DATA` trees mock the snap runtime so `src/bin/conf` can be exercised locally outside confinement (set `SNAP`, `NANOMQ_CONF`, `VIM`, `SNAP_UID=0`, `SNAP_INSTANCE_NAME` explicitly to mimic the snap environment).
 
 ## Architecture
 
 ### snapcraft.yaml
 
-Three parts: `nanomq` (cmake build of upstream with TLS, SQLite, ACL, and rule engine enabled — the commented block at the bottom of the yaml catalogs all other available cmake flags), `local` (dumps `src/` into the snap and stages `vim-tiny`), and `crash` (a nil part ordered after the others, used as a build-stage hook).
+Three parts: `nanomq` (cmake build of upstream with TLS, SQLite, ACL, and rule engine enabled — the commented block at the bottom of the yaml catalogs all other available cmake flags), `local` (dumps `src/` into the snap and stages `vim-tiny`), and `crash` (a deliberate debugging hook: a nil part ordered after the others whose `override-prime` you flip to a failing command when you want `snapcraft --debug` to drop you into the build container after the real parts have built).
 
 Three snap apps are exposed:
 
@@ -49,4 +58,14 @@ Three snap apps are exposed:
 
 ### Version bumps
 
-Everything derives from `version:` in `snap/snapcraft.yaml` — the Makefile reads it with `yq` to name the local clone directory, pick the upstream git tag, and name the `.snap` file. To bump: change that one field (the upstream tag must exist), then `make build-remote` (or `build-local`) and `make install` to verify.
+Everything derives from `version:` in `snap/snapcraft.yaml` — the Makefile and CI read it with `yq` to name the local clone directory, pick the upstream git tag, derive the store track, and name the `.snap` file. Upstream tags are plain semver with **no `v` prefix** (`0.24.14`). Renovate (`renovate.json`) watches `nanomq/nanomq` GitHub releases and opens PRs bumping that one field; manual bumps are the same one-field change.
+
+## CI / release pipeline
+
+Ported from `giaever-online-iot/zwave-js-ui`; all channel/version math lives in `.github/scripts/snap-release.sh` (unit-tested, handles nanomq's un-prefixed versions — store tracks stay v-prefixed, e.g. version `0.24.14` → track `v0.24`).
+
+- **PRs must target `main` from an in-repo branch** — fork PRs are auto-closed and labeled (`block-fork-prs.yml`).
+- `pr-build-snap.yml`: PRs touching `snap/**` or `src/**` are remote-built on Launchpad for every arch in `platforms:` and each arch is **published to `v<major.minor>/edge/<PR#>`** as soon as it finishes (the track is created first via the storefront API). A sticky PR comment shows the channel and install command; the always-on `gate` job is safe to require in branch protection. Docs-only PRs skip the build.
+- `release-on-merge.yml`: on merge, **promotes** the PR's revisions to `v<MM>/stable` plus `latest/candidate`/`latest/edge` (never downgrading a channel), and moves the default track forward.
+- Required repo secrets: `LAUNCHPAD_CREDENTIALS`, `SNAPCRAFT_STORE_CREDENTIALS`, and `SNAPCRAFT_SESSION_COOKIE` (a snapcraft.io web session cookie — expires and needs periodic refresh; when track creation fails, this is the first suspect).
+- `tests/snapcraft_state_test.sh` (run by `lint-test.yml`) fails if snapcraft.yaml is committed in the `make local-source` state.
