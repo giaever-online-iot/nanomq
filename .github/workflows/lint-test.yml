@@ -1,0 +1,29 @@
+name: Lint & test
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - '.github/workflows/lint-test.yml'
+  workflow_dispatch:
+
+jobs:
+  lint-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: shellcheck
+        # All snap scripts + the repo tests, at warning severity (-x follows sourced
+        # files).
+        run: |
+          sudo apt-get update && sudo apt-get install -y shellcheck
+          shellcheck --severity=warning -x src/bin/* src/wrappers/* src/helpers/* tests/*.sh
+      - name: Install yq
+        run: sudo snap install yq
+      - name: Unit tests
+        run: |
+          for t in tests/*_test.sh; do
+            echo "== $t"
+            bash "$t" || exit 1
+          done
