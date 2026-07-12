@@ -6,9 +6,9 @@ export SNAP_UID="${SNAP_UID:-0}"
 . "${SNAP:-"$(pwd)/src"}/helpers/functions"
 
 ensure_root
-cd $SNAP
+cd "${SNAP:-"$(pwd)/src"}" || exit
 
-if [ ! -a "${VIM}" -o ! -s "${VIM}" ]; then 
+if [ ! -e "${VIM}" ] || [ ! -s "${VIM}" ]; then
 	logp "Creating: ${VIM}"
 	echo -e "set nocompatible\nset number\nset tabstop=4\nset autoindent" > $VIM
 fi
@@ -21,7 +21,7 @@ function edit {
 }
 
 function print_conf_opts {
-	for CONF in $@; do
+	for CONF in "$@"; do
 		((I++))
 		echo -e " $I:\t$(basename "$CONF")"
 	done
@@ -32,33 +32,32 @@ RWD="$(dirname "${NANOMQ_CONF:-"$(pwd)/test/SNAP_DATA/nanomq.conf"}")"
 ROD="${SNAP:-"$(pwd)/test/SNAP"}"
 ARGS="$([ -a "${NANOMQ_CONF}" ] && echo "${@}" || echo "${@:-"*"}")"
 
-#set -x
-CONF_RW=( $(search_conf "${RWD}" "/" "${ARGS}") )
-CONF_RO=( $(search_conf "${ROD}" "usr/local/etc/" "${ARGS}"))
-#set +x
-CONFS=( ${CONF_RW[@]} ${CONF_RO[@]} )
+# config paths never contain whitespace, so newline-splitting the find output is safe
+mapfile -t CONF_RW < <(search_conf "${RWD}" "/" "${ARGS}")
+mapfile -t CONF_RO < <(search_conf "${ROD}" "usr/local/etc/" "${ARGS}")
+CONFS=( "${CONF_RW[@]}" "${CONF_RO[@]}" )
 
 if [ "${#CONF_RW[@]}" -ne 0 ]; then
 	echo -e "\nEdit an existing configuration"
-	print_conf_opts ${CONF_RW[@]}
+	print_conf_opts "${CONF_RW[@]}"
 fi
 
 echo -e "\nCopy and edit an example"
-print_conf_opts ${CONF_RO[@]}
+print_conf_opts "${CONF_RO[@]}"
 
 while : ; do 
 	echo ""
 	read -p "Choose [1 - ${#CONFS[@]}]: " CONF_NO
 
-	if [ "${CONF_NO:-0}" -gt 0 -a "${CONF_NO:-0}" -le "${#CONFS[@]}" ]; then
+	if [ "${CONF_NO:-0}" -gt 0 ] && [ "${CONF_NO:-0}" -le "${#CONFS[@]}" ]; then
 		((CONF_NO--))
 		CONF="${CONFS[$CONF_NO]}"
 		if [ ! -w "${CONF}" ]; then
 			FN="$(basename "${CONF}")"
-			FN="${FN#nanomq_}" 
-			CONF_RW="${RWD}/$([ "${FN}" == ".conf" -o "${FN}" == "old.conf" -o "${FN}" == "example.conf" ] && echo "$(basename "${NANOMQ_CONF:-"nanomq.conf"}")" || echo "$(basename "${CONF}")")"
-			cp -i "${CONF}" "${CONF_RW}"
-			CONF="${CONF_RW}"
+			FN="${FN#nanomq_}"
+			CONF_DST="${RWD}/$([ "${FN}" == ".conf" ] || [ "${FN}" == "old.conf" ] || [ "${FN}" == "example.conf" ] && echo "$(basename "${NANOMQ_CONF:-"nanomq.conf"}")" || echo "$(basename "${CONF}")")"
+			cp -i "${CONF}" "${CONF_DST}"
+			CONF="${CONF_DST}"
 		fi
 		edit "${CONF}"
 	else
