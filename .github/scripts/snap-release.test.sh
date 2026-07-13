@@ -16,10 +16,10 @@ check() { # desc expected actual
   fi
 }
 
-check "version-to-track v-prefixed" "v11" "$("$SR" version-to-track v11.19.1)"
-check "version-to-track bare"       "v11" "$("$SR" version-to-track 11.19.1)"
-check "version-to-track x.0"        "v12" "$("$SR" version-to-track v12.0.0)"
-check "version-to-track empty"      ""    "$("$SR" version-to-track "")"
+check "version-to-track v-prefixed" "11" "$("$SR" version-to-track v11.19.1)"
+check "version-to-track bare"       "11" "$("$SR" version-to-track 11.19.1)"
+check "version-to-track x.0"        "12" "$("$SR" version-to-track v12.0.0)"
+check "version-to-track empty"      ""   "$("$SR" version-to-track "")"
 
 check "major v-prefixed" "12" "$("$SR" major v12.0.0)"
 check "major bare"       "11" "$("$SR" major 11.19.1)"
@@ -64,23 +64,24 @@ check "latest-targets backport"     ""                             "$("$SR" late
 check "latest-targets empty-floors" "latest/candidate latest/edge" "$("$SR" latest-targets v11.20.0 "" "")"
 
 # ---- nanomq: plain upstream versions (no 'v' prefix, e.g. 0.23.1) and the odd
-# suffixed tag (0.25.2-2 — suffix is ignored for ordering). Tracks stay v-prefixed
-# and are MAJOR-only (v0, v1, ...): the store's track guardrail for nanomq only
-# permits v<major> names, unlike zwave-js-ui's v<major>.<minor>.
+# suffixed tag (0.25.2-2 — suffix is ignored for ordering). Tracks are the BARE
+# major (0, 1, ...): the store's track guardrail for nanomq only permits <major>
+# names — it 400s on both dotted (v0.23) and v-prefixed (v0) forms, unlike
+# zwave-js-ui's guardrail which grants v<major>.<minor>.
 NMQ="$HERE/fixtures/snapcraft-status-nanomq.txt"
-check "plain version-to-track"          "v0"      "$("$SR" version-to-track 0.23.1)"
-check "plain version-to-track suffixed" "v0"      "$("$SR" version-to-track 0.25.2-2)"
-check "plain version-to-track 1.x"      "v1"      "$("$SR" version-to-track 1.2.3)"
+check "plain version-to-track"          "0"       "$("$SR" version-to-track 0.23.1)"
+check "plain version-to-track suffixed" "0"       "$("$SR" version-to-track 0.25.2-2)"
+check "plain version-to-track 1.x"      "1"       "$("$SR" version-to-track 1.2.3)"
 check "plain major"                     "0"       "$("$SR" major 0.24.14)"
 
 check "plain channel-version candidate" "0.24.14" "$("$SR" channel-version latest/candidate <"$NMQ")"
 check "plain channel-version stable"    "0.23.1"  "$("$SR" channel-version latest/stable <"$NMQ")"
 check "plain channel-version inherited" ""        "$("$SR" channel-version latest/beta <"$NMQ")"
-check "plain channel-version branch"    "0.24.14" "$("$SR" channel-version v0/edge/12 <"$NMQ")"
+check "plain channel-version branch"    "0.24.14" "$("$SR" channel-version 0/edge/12 <"$NMQ")"
 check "plain channel-version absent"    ""        "$("$SR" channel-version v9.9/stable <"$NMQ")"
 
-check "plain branch-has-revisions yes"  "yes"     "$("$SR" branch-has-revisions v0 12 <"$NMQ")"
-check "plain branch-has-revisions no"   "no"      "$("$SR" branch-has-revisions v0 99 <"$NMQ")"
+check "plain branch-has-revisions yes"  "yes"     "$("$SR" branch-has-revisions 0 12 <"$NMQ")"
+check "plain branch-has-revisions no"   "no"      "$("$SR" branch-has-revisions 0 99 <"$NMQ")"
 
 check "plain is-at-least greater"       "yes"     "$("$SR" is-at-least 0.24.14 0.23.1)"
 check "plain is-at-least lesser"        "no"      "$("$SR" is-at-least 0.23.1 0.24.14)"

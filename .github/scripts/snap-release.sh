@@ -4,7 +4,7 @@
 # release workflows. Pure functions: read args/stdin, write stdout, no network.
 #
 # Subcommands:
-#   version-to-track <ver>             v11.19.1|11.19.1 -> v11       (""->"")
+#   version-to-track <ver>             v11.19.1|11.19.1 -> 11        (""->"")
 #   major <ver>                        v12.0.0 -> 12                 (""->"")
 #   channel-version <channel>          (stdin: `snapcraft status`) -> version or "" (^/--/- -> "")
 #   branch-has-revisions <track> <pr>  (stdin: `snapcraft status`) -> yes|no
@@ -41,12 +41,13 @@ _at_least() {
 cmd="${1:-}"; shift || true
 case "$cmd" in
   version-to-track)
-    # MAJOR-only tracks (v0, v1, ...): the store's track guardrail for nanomq only
-    # permits v<major> names — create-track 400s on dotted names like v0.23.
+    # BARE-major tracks (0, 1, ...): the store's track guardrail for nanomq only
+    # permits <major> names — create-track 400s on dotted (v0.23) AND v-prefixed
+    # (v0: "Invalid track name") forms. Same shape as the node snap's 20/22 tracks.
     in="${1:-}"
     if [ -z "$in" ]; then echo ""; exit 0; fi
     in="${in#v}"
-    printf 'v%s\n' "${in%%.*}"
+    printf '%s\n' "${in%%.*}"
     ;;
   major)
     in="${1:-}"
@@ -63,9 +64,12 @@ case "$cmd" in
     # read the Channel as the field immediately before it. nanomq versions have no 'v'
     # prefix (0.23.1), so the pattern is `^v?[0-9]+\.` — the required dot keeps integer
     # Revision fields from matching; `↑` inherited markers and `-` empties never match.
+    # Track names are bare majors (0), but the carry regex also accepts v-prefixed and
+    # dotted names so the parser stays layout-general. Bare numbers are safe here: in
+    # both snapcraft layouts $1 is only ever a Track or a Channel name, never a Revision.
     ch="${1:-}"
     awk -v t="${ch%%/*}" -v c="${ch#*/}" '
-      $1 ~ /^(latest|v[0-9][0-9.]*)$/ { tr = $1 }
+      $1 ~ /^(latest|v?[0-9][0-9.]*)$/ { tr = $1 }
       { for (i = 2; i <= NF; i++) if ($i ~ /^v?[0-9]+\./) { if (tr == t && $(i-1) == c) { print $i; exit } break } }'
     ;;
   branch-has-revisions)

@@ -4,6 +4,6 @@ latest   amd64    candidate  0.24.14    58          -           -
 latest   amd64    beta       ↑          ↑           -           -
 latest   amd64    edge       0.24.14    60          -           -
 latest   riscv64  stable     0.23.1     44          -           -
-v0       amd64    stable     0.24.14    58          -           -
-v0       amd64    candidate  ↑          ↑           -           -
-v0       amd64    edge/12    0.24.14    58          -           2026-07-21T00:00:00Z
+0        amd64    stable     0.24.14    58          -           -
+0        amd64    candidate  ↑          ↑           -           -
+0        amd64    edge/12    0.24.14    58          -           2026-07-21T00:00:00Z

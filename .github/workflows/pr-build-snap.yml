@@ -138,7 +138,7 @@ jobs:
       - name: Remote-build ${{ matrix.arch }}
         id: build
         run: .github/scripts/remote-build.sh "${{ matrix.arch }}"
-      - name: Publish ${{ matrix.arch }} to v<major>/edge/<PR>
+      - name: Publish ${{ matrix.arch }} to <major>/edge/<PR>
         id: publish
         # PR-only (no PR number on dispatch) and only with a valid snap + a track.
         if: ${{ github.event_name == 'pull_request' && needs.ensure-track.result == 'success' && steps.build.outputs.snaps != '0' }}
