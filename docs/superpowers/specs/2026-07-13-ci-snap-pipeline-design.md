@@ -13,7 +13,7 @@ Give this snap-packaging repo the same CI/release pipeline as the sibling zwave-
 1. **Full parity** with zwave-js-ui CI: all five workflows, including fork-PR blocking and lint/helper tests.
 2. **Renovate** for upstream update PRs (already active on this org; proven on zwave-js-ui).
 3. **Per-minor store tracks** (`v0.23`, `v0.24`, …): PRs publish to `v<MM>/edge/<PR#>`, merges promote to `v<MM>/stable` + `latest/*`.
-   **Amended 2026-07-14:** the Snap Store track guardrail granted for nanomq only permits **bare `<major>`** names (zwave-js-ui's permits `v<major>.<minor>`; here create-track 400ed on `v0.23` with "Missing guardrails" pre-guardrail and on `v0` with "Invalid track name" post-guardrail). Tracks are therefore bare majors (`0`, `1`, …, node-snap style): PRs publish to `<major>/edge/<PR#>`, merges promote to `<major>/stable` + `latest/*`.
+   **Amended 2026-07-14:** the Snap Store track guardrail granted for nanomq only permits **bare `<major>`** names (zwave-js-ui's permits `v<major>.<minor>`; here create-track 400ed on `v0.23` with "Missing guardrails" pre-guardrail and on `v0` with "Invalid track name" post-guardrail). Tracks are therefore bare majors (`0`, `1`, …, node-snap style): PRs publish to `<major>/edge/pr-<PR#>`, merges promote to `<major>/stable` + `latest/*`. The PR branch is `pr-<PR#>` rather than the bare number because store branch names must be ≥ 2 characters — uploading to `0/edge/2` failed with "Invalid branch name: 2" (a latent bug for any snap repo with single-digit PR numbers, including the sibling).
 
 Confirmed preconditions: the `nanomq` store name is owned by publisher Giaever.online (giaever-online); upstream releases are plain semver tags without a `v` prefix (e.g. `0.24.14`).
 

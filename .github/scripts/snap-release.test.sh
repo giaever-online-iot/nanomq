@@ -28,7 +28,7 @@ check "major empty"      ""   "$("$SR" major "")"
 check "channel-version candidate"  "v11.20.0" "$("$SR" channel-version latest/candidate <"$INFO")"
 check "channel-version stable"     "v11.14.0" "$("$SR" channel-version latest/stable <"$INFO")"
 check "channel-version inherited"  ""         "$("$SR" channel-version latest/beta <"$INFO")"
-check "channel-version branch"     "v11.20.0" "$("$SR" channel-version v11.20/edge/204 <"$INFO")"
+check "channel-version branch"     "v11.20.0" "$("$SR" channel-version v11.20/edge/pr-204 <"$INFO")"
 check "channel-version absent"     ""         "$("$SR" channel-version v99.9/stable <"$INFO")"
 
 check "branch-has-revisions yes"   "yes" "$("$SR" branch-has-revisions v11.20 204 <"$INFO")"
@@ -39,7 +39,7 @@ check "branch-has-revisions no"    "no"  "$("$SR" branch-has-revisions v11.20 99
 # but the parser is hardened for both — these lock that in.
 TTY="$HERE/fixtures/snapcraft-status-tty.txt"
 check "tty channel-version candidate" "v11.20.0" "$("$SR" channel-version latest/candidate <"$TTY")"
-check "tty channel-version branch"    "v11.20.0" "$("$SR" channel-version v11.20/edge/204 <"$TTY")"
+check "tty channel-version branch"    "v11.20.0" "$("$SR" channel-version v11.20/edge/pr-204 <"$TTY")"
 check "tty channel-version inherited" ""         "$("$SR" channel-version latest/beta <"$TTY")"
 check "tty branch-has-revisions yes"  "yes"      "$("$SR" branch-has-revisions v11.20 204 <"$TTY")"
 
@@ -77,7 +77,7 @@ check "plain major"                     "0"       "$("$SR" major 0.24.14)"
 check "plain channel-version candidate" "0.24.14" "$("$SR" channel-version latest/candidate <"$NMQ")"
 check "plain channel-version stable"    "0.23.1"  "$("$SR" channel-version latest/stable <"$NMQ")"
 check "plain channel-version inherited" ""        "$("$SR" channel-version latest/beta <"$NMQ")"
-check "plain channel-version branch"    "0.24.14" "$("$SR" channel-version 0/edge/12 <"$NMQ")"
+check "plain channel-version branch"    "0.24.14" "$("$SR" channel-version 0/edge/pr-12 <"$NMQ")"
 check "plain channel-version absent"    ""        "$("$SR" channel-version v9.9/stable <"$NMQ")"
 
 check "plain branch-has-revisions yes"  "yes"     "$("$SR" branch-has-revisions 0 12 <"$NMQ")"
