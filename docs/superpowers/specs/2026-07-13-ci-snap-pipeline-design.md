@@ -13,6 +13,7 @@ Give this snap-packaging repo the same CI/release pipeline as the sibling zwave-
 1. **Full parity** with zwave-js-ui CI: all five workflows, including fork-PR blocking and lint/helper tests.
 2. **Renovate** for upstream update PRs (already active on this org; proven on zwave-js-ui).
 3. **Per-minor store tracks** (`v0.23`, `v0.24`, …): PRs publish to `v<MM>/edge/<PR#>`, merges promote to `v<MM>/stable` + `latest/*`.
+   **Amended 2026-07-14:** the Snap Store track guardrail granted for nanomq only permits `v<major>` names (zwave-js-ui's permits `v<major>.<minor>`; create-track 400s on dotted names here). Tracks are therefore **major-only** (`v0`, `v1`, …): PRs publish to `v<major>/edge/<PR#>`, merges promote to `v<major>/stable` + `latest/*`.
 
 Confirmed preconditions: the `nanomq` store name is owned by publisher Giaever.online (giaever-online); upstream releases are plain semver tags without a `v` prefix (e.g. `0.24.14`).
 
@@ -38,7 +39,7 @@ Ported from the sibling: `retry.sh`, `remote-build.sh`, `snap-create-track.sh`, 
 - `_vercmp` hardening: upstream occasionally publishes suffixed tags (`0.25.2-2`). Each dot component is truncated at the first non-digit and defaults to 0, so `0.25.2-2` compares as `0.25.2` instead of tripping bash arithmetic. Documented as: suffix is ignored for ordering.
 - Tests keep the sibling's v-prefixed cases and add un-prefixed + suffixed cases with a nanomq-style `snapcraft status` fixture.
 
-`version-to-track 0.23.1` already yields `v0.23` with the sibling logic (it strips an optional `v`, then prefixes `v`).
+`version-to-track 0.23.1` already yields `v0.23` with the sibling logic (it strips an optional `v`, then prefixes `v`). **Amended 2026-07-14:** per the guardrail amendment above, `version-to-track` now truncates to the major instead (`0.23.1` → `v0`).
 
 ### renovate.json
 

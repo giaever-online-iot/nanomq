@@ -4,7 +4,7 @@
 # release workflows. Pure functions: read args/stdin, write stdout, no network.
 #
 # Subcommands:
-#   version-to-track <ver>             v11.19.1|11.19.1 -> v11.19    (""->"")
+#   version-to-track <ver>             v11.19.1|11.19.1 -> v11       (""->"")
 #   major <ver>                        v12.0.0 -> 12                 (""->"")
 #   channel-version <channel>          (stdin: `snapcraft status`) -> version or "" (^/--/- -> "")
 #   branch-has-revisions <track> <pr>  (stdin: `snapcraft status`) -> yes|no
@@ -41,11 +41,12 @@ _at_least() {
 cmd="${1:-}"; shift || true
 case "$cmd" in
   version-to-track)
+    # MAJOR-only tracks (v0, v1, ...): the store's track guardrail for nanomq only
+    # permits v<major> names — create-track 400s on dotted names like v0.23.
     in="${1:-}"
     if [ -z "$in" ]; then echo ""; exit 0; fi
     in="${in#v}"
-    IFS=. read -ra parts <<<"$in"
-    printf 'v%s.%s\n' "${parts[0]}" "${parts[1]:-0}"
+    printf 'v%s\n' "${in%%.*}"
     ;;
   major)
     in="${1:-}"

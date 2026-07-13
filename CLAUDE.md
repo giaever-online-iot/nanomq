@@ -62,10 +62,10 @@ Everything derives from `version:` in `snap/snapcraft.yaml` — the Makefile and
 
 ## CI / release pipeline
 
-Ported from `giaever-online-iot/zwave-js-ui`; all channel/version math lives in `.github/scripts/snap-release.sh` (unit-tested, handles nanomq's un-prefixed versions — store tracks stay v-prefixed, e.g. version `0.24.14` → track `v0.24`).
+Ported from `giaever-online-iot/zwave-js-ui`; all channel/version math lives in `.github/scripts/snap-release.sh` (unit-tested, handles nanomq's un-prefixed versions — store tracks stay v-prefixed but are **major-only**, e.g. version `0.24.14` → track `v0`, because the Snap Store track guardrail for nanomq only permits `v<major>` names, unlike zwave-js-ui's `v<major>.<minor>`).
 
 - **PRs must target `main` from an in-repo branch** — fork PRs are auto-closed and labeled (`block-fork-prs.yml`).
-- `pr-build-snap.yml`: PRs touching `snap/**` or `src/**` are remote-built on Launchpad for every arch in `platforms:` and each arch is **published to `v<major.minor>/edge/<PR#>`** as soon as it finishes (the track is created first via the storefront API). A sticky PR comment shows the channel and install command; the always-on `gate` job is safe to require in branch protection. Docs-only PRs skip the build.
-- `release-on-merge.yml`: on merge, **promotes** the PR's revisions to `v<MM>/stable` plus `latest/candidate`/`latest/edge` (never downgrading a channel), and moves the default track forward.
+- `pr-build-snap.yml`: PRs touching `snap/**` or `src/**` are remote-built on Launchpad for every arch in `platforms:` and each arch is **published to `v<major>/edge/<PR#>`** as soon as it finishes (the track is created first via the storefront API). A sticky PR comment shows the channel and install command; the always-on `gate` job is safe to require in branch protection. Docs-only PRs skip the build.
+- `release-on-merge.yml`: on merge, **promotes** the PR's revisions to `v<major>/stable` plus `latest/candidate`/`latest/edge` (never downgrading a channel), and moves the default track forward.
 - Required repo secrets: `LAUNCHPAD_CREDENTIALS`, `SNAPCRAFT_STORE_CREDENTIALS`, and `SNAPCRAFT_SESSION_COOKIE` (a snapcraft.io web session cookie — expires and needs periodic refresh; when track creation fails, this is the first suspect).
 - `tests/snapcraft_state_test.sh` (run by `lint-test.yml`) fails if snapcraft.yaml is committed in the `make local-source` state.
