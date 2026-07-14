@@ -1,0 +1,313 @@
+name: PR Build Snap
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+    # Runs on EVERY PR so the always-on `gate` job can be a required status check.
+    # The expensive build still runs ONLY when build inputs change — the `changes`
+    # job detects snap/**, src/** and gates the build jobs; docs/config PRs
+    # skip the build and `gate` reports green trivially.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: pr-build-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  SNAP_NAME: nanomq
+
+jobs:
+  # Detect whether this PR touches build inputs. Runs on every PR; its output gates
+  # the expensive build jobs and lets `gate` (a required check) pass docs/CI PRs.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      build: ${{ steps.f.outputs.build }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Detect build-affecting changes
+        id: f
+        run: |
+          set -euo pipefail
+          # workflow_dispatch has no PR diff — treat it as a (build-only) build.
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "build=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          base="${{ github.event.pull_request.base.sha }}"
+          if git diff --name-only "$base" HEAD | grep -qE '^(snap/|src/)'; then
+            echo "build=true"  >> "$GITHUB_OUTPUT"
+          else
+            echo "build=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  meta:
+    needs: changes
+    if: ${{ needs.changes.outputs.build == 'true' }}
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      track: ${{ steps.meta.outputs.track }}
+      archs: ${{ steps.meta.outputs.archs }}
+      archs_csv: ${{ steps.meta.outputs.archs_csv }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Resolve version / track / archs
+        id: meta
+        run: |
+          set -euo pipefail
+          V="$(yq '.version' snap/snapcraft.yaml)"
+          TRACK="$(.github/scripts/snap-release.sh version-to-track "$V")"
+          ARCHS_JSON="$(yq -o=json -I=0 '.platforms | keys' snap/snapcraft.yaml)"
+          ARCHS_CSV="$(yq '.platforms | keys | join(",")' snap/snapcraft.yaml)"
+          {
+            echo "version=$V"
+            echo "track=$TRACK"
+            echo "archs=$ARCHS_JSON"
+            echo "archs_csv=$ARCHS_CSV"
+          } >> "$GITHUB_OUTPUT"
+
+  # Runs in parallel with the builds: it only needs the track NAME, so a failed
+  # build never blocks or skips it. Idempotent (the script checks existence first).
+  ensure-track:
+    needs: meta
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    env:
+      SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+      SNAPCRAFT_SESSION_COOKIE: ${{ secrets.SNAPCRAFT_SESSION_COOKIE }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install snapcraft
+        run: sudo snap install snapcraft --classic
+      - name: Ensure version track exists
+        run: |
+          set -euo pipefail
+          TRACK="${{ needs.meta.outputs.track }}"
+          # Listing tracks uses the macaroon; skip create if it already exists.
+          if snapcraft tracks "$SNAP_NAME" | awk 'NR>1{print $1}' | grep -qx "$TRACK"; then
+            echo "Track $TRACK already exists."
+            exit 0
+          fi
+          bash .github/scripts/snap-create-track.sh "$SNAP_NAME" "$TRACK"
+
+  # One job per arch that BUILDS *and* PUBLISHES, so each arch ships the moment its
+  # own build finishes — no waiting on sibling arches (GitHub has no per-matrix-leg
+  # dependencies, so a separate `upload` job that `needs: build` would block on ALL
+  # build legs). The snap is uploaded to the store straight off the runner: no GitHub
+  # artifact round-trip for it, which also removes the `download-artifact` digest-
+  # mismatch failure class. `needs: ensure-track` only so the store upload can't race
+  # a missing track; on workflow_dispatch the publish step is skipped (build-only).
+  build-publish:
+    needs: [meta, ensure-track]
+    # Run when the build ran (meta succeeded); tolerate ensure-track being skipped
+    # on workflow_dispatch. !cancelled() keeps it alive when a needed job is skipped.
+    if: ${{ !cancelled() && needs.meta.result == 'success' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false           # a dead arch must not cancel its siblings
+      matrix:
+        arch: ${{ fromJSON(needs.meta.outputs.archs) }}
+    env:
+      SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0         # snapcraft remote-build refuses shallow clones
+      - name: Install snapcraft
+        run: sudo snap install snapcraft --classic
+      - name: Configure Launchpad credentials
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.local/share/snapcraft
+          printf '%s\n' "${{ secrets.LAUNCHPAD_CREDENTIALS }}" > ~/.local/share/snapcraft/launchpad-credentials
+      # GitHub runners have no working IPv6 route, but launchpad.net publishes AAAA
+      # records — so snapcraft's artifact download intermittently dies with
+      # "[Errno 101] Network is unreachable" when a fetch resolves IPv6 first (seen
+      # 6x consecutively on amd64 in PR #228, while arm64/armhf fetched the same host
+      # over IPv4 fine). snapcraft is a classic snap, so it honours the host's
+      # /etc/gai.conf; prefer IPv4 to force the reachable address.
+      - name: Prefer IPv4 for the Launchpad fetch
+        run: echo 'precedence ::ffff:0:0/96 100' | sudo tee -a /etc/gai.conf
+      - name: Remote-build ${{ matrix.arch }}
+        id: build
+        run: .github/scripts/remote-build.sh "${{ matrix.arch }}"
+      - name: Publish ${{ matrix.arch }} to <major>/edge/pr-<PR>
+        id: publish
+        # PR-only (no PR number on dispatch) and only with a valid snap + a track.
+        if: ${{ github.event_name == 'pull_request' && needs.ensure-track.result == 'success' && steps.build.outputs.snaps != '0' }}
+        run: |
+          set -euo pipefail
+          TRACK="${{ needs.meta.outputs.track }}"
+          PR="${{ github.event.pull_request.number }}"
+          # Branch pr-<PR>, not the bare number: store branch names must be >= 2 chars.
+          CHAN="$TRACK/edge/pr-$PR"
+          ARCH="${{ matrix.arch }}"
+          f="$(ls -1 "${SNAP_NAME}"*"${ARCH}".snap 2>/dev/null | head -n1 || true)"
+          if [ -z "$f" ]; then echo "::error::No snap artifact for ${ARCH}."; exit 1; fi
+          echo "Uploading $f -> $CHAN"
+          .github/scripts/retry.sh 3 15 -- snapcraft upload "$f" --release="$CHAN"
+      - name: Mark published
+        if: ${{ steps.publish.outcome == 'success' }}
+        run: |
+          mkdir -p out && : > "out/uploaded-${{ matrix.arch }}"
+      - name: Upload published marker
+        if: ${{ steps.publish.outcome == 'success' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: uploaded-${{ matrix.arch }}
+          path: out/uploaded-${{ matrix.arch }}
+          retention-days: 7
+          if-no-files-found: error
+      - name: Snap artifact (record; off the publish path)
+        if: ${{ steps.build.outputs.snaps != '0' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: snap-${{ matrix.arch }}
+          path: ${{ env.SNAP_NAME }}*${{ matrix.arch }}.snap
+          retention-days: 7
+          if-no-files-found: error
+      - name: Capture snapcraft log on failure
+        if: ${{ always() && steps.build.outputs.snaps == '0' }}
+        run: |
+          shopt -s nullglob
+          logs=( ~/.local/state/snapcraft/log/*.log ~/.cache/snapcraft/log/*.log )
+          out="${RUNNER_TEMP}/buildlog-${{ matrix.arch }}.txt"; : > "$out"
+          if [ ${#logs[@]} -eq 0 ]; then
+            echo "(no snapcraft log files found for ${{ matrix.arch }})" >> "$out"
+          else
+            for f in "${logs[@]}"; do { echo "===== $f ====="; cat "$f"; } >> "$out"; done
+          fi
+          tail -c 50000 "$out" > "$out.cut" && mv "$out.cut" "$out"
+          echo "BUILDLOG=$out" >> "$GITHUB_ENV"
+      - name: Upload snapcraft log artifact
+        if: ${{ always() && steps.build.outputs.snaps == '0' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: buildlog-${{ matrix.arch }}
+          path: ${{ env.BUILDLOG }}
+          retention-days: 7
+          if-no-files-found: ignore
+          overwrite: true   # "Re-run failed jobs" re-runs this leg; replace the prior attempt's log
+      - name: Require this arch to have published (build PRs)
+        # Make THIS arch's leg red when it didn't publish, so a transient gets a
+        # targeted "Re-run failed jobs" and the failure is visible per-arch. The
+        # cross-arch completeness decision still lives in `report`/`gate`.
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && needs.ensure-track.result == 'success' }}
+        run: |
+          if [ "${{ steps.publish.outcome }}" != "success" ]; then
+            echo "::error::${{ matrix.arch }}: build/publish did not succeed (snaps=${{ steps.build.outputs.snaps }}, publish=${{ steps.publish.outcome }})."
+            exit 1
+          fi
+          echo "${{ matrix.arch }} published."
+
+  report:
+    needs: [changes, meta, ensure-track, build-publish]
+    if: ${{ always() && github.event_name == 'pull_request' && needs.changes.outputs.build == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Download published markers
+        uses: actions/download-artifact@v8
+        with:
+          pattern: uploaded-*
+          path: markers
+          merge-multiple: true
+        continue-on-error: true
+      - name: Download build logs
+        uses: actions/download-artifact@v8
+        with:
+          pattern: buildlog-*
+          path: buildlogs
+          merge-multiple: true
+        continue-on-error: true
+      - name: Render comment + completeness
+        id: r
+        run: |
+          set -euo pipefail
+          TRACK="${{ needs.meta.outputs.track }}"
+          PR="${{ github.event.pull_request.number }}"
+          CHAN="$TRACK/edge/pr-$PR"
+          WANTED="${{ needs.meta.outputs.archs_csv }}"
+          PUBLISHED="$(ls markers/ 2>/dev/null | sed -n 's/^uploaded-//p' | paste -sd, - || true)"
+          BODY="${RUNNER_TEMP}/comment.md"
+          SNAP_NAME="$SNAP_NAME" .github/scripts/pr-comment.sh "$CHAN" "$WANTED" "$PUBLISHED" > "$BODY"
+          # When the track couldn't be ensured (e.g. expired SNAPCRAFT_SESSION_COOKIE),
+          # uploads are skipped even though builds may have succeeded — say so explicitly
+          # rather than letting the comment read like a build failure.
+          if [ "${{ needs.ensure-track.result }}" != "success" ]; then
+            {
+              echo
+              echo '⚠️ Release was blocked: the version track could not be ensured (see the **ensure-track** job — e.g. an expired `SNAPCRAFT_SESSION_COOKIE`). Builds may have succeeded; fix the cause and use "Re-run failed jobs".'
+            } >> "$BODY"
+          fi
+          # Fold the build log into the comment only when nothing was published.
+          if [ -z "$PUBLISHED" ] && ls buildlogs/* >/dev/null 2>&1; then
+            {
+              echo
+              echo '<details><summary>snapcraft log (last 50 KB)</summary>'
+              echo
+              echo '```text'
+              cat buildlogs/*
+              echo '```'
+              echo
+              echo '</details>'
+            } >> "$BODY"
+          fi
+          echo "body=$BODY" >> "$GITHUB_OUTPUT"
+          w="$(printf '%s' "$WANTED"    | tr ',' '\n' | sed '/^$/d' | sort -u)"
+          p="$(printf '%s' "$PUBLISHED" | tr ',' '\n' | sed '/^$/d' | sort -u)"
+          if [ "$w" = "$p" ]; then echo "complete=yes" >> "$GITHUB_OUTPUT"; else echo "complete=no" >> "$GITHUB_OUTPUT"; fi
+          missing="$(comm -23 <(printf '%s\n' "$w") <(printf '%s\n' "$p") | paste -sd, - || true)"
+          echo "missing=$missing" >> "$GITHUB_OUTPUT"
+      - name: Sticky PR comment
+        uses: actions/github-script@v9
+        env:
+          BODY: ${{ steps.r.outputs.body }}
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- pr-build-snap -->';
+            const text = fs.readFileSync(process.env.BODY, 'utf8');
+            const body = `${marker}\n${text}`;
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.pull_request.number;
+            const api = github.rest.issues;
+            const { data: comments } = await api.listComments({ owner, repo, issue_number, per_page: 100 });
+            const existing = comments.find(c => c.body && c.body.includes(marker));
+            if (existing) await api.updateComment({ owner, repo, comment_id: existing.id, body });
+            else await api.createComment({ owner, repo, issue_number, body });
+      - name: Fail if any wanted arch is unpublished
+        if: ${{ steps.r.outputs.complete != 'yes' }}
+        run: |
+          echo "::error::Incomplete publish: missing=[${{ steps.r.outputs.missing }}] wanted=[${{ needs.meta.outputs.archs_csv }}]"
+          exit 1
+
+  # Always-on required check: green unless this PR changes build inputs AND the
+  # build/publish (report) did not succeed. Safe to require in branch protection —
+  # it lets docs/CI PRs through while blocking a merge-before-publish of a build PR.
+  gate:
+    needs: [changes, report]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require a published build for build-affecting PRs
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "Not a pull_request event — gate not applicable."; exit 0
+          fi
+          if [ "${{ needs.changes.outputs.build }}" != "true" ]; then
+            echo "No snap/src/requirements changes — no build required; gate passes."; exit 0
+          fi
+          if [ "${{ needs.report.result }}" = "success" ]; then
+            echo "Build published successfully; gate passes."; exit 0
+          fi
+          echo "::error::This PR changes build inputs but the snap build/publish did not succeed (report=${{ needs.report.result }}). Don't merge until the build is green and published."
+          exit 1

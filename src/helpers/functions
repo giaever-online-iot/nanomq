@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 function logp {
-	logger $@ && echo -e $@
+	logger "$@" && echo -e "$@"
 }
 
 function ensure_root {
@@ -13,7 +13,7 @@ function path {
 }
 
 function fn {
-	echo "nanomq$([ "$#" -eq 1 -a "${1}" = "*" ] && echo "*" || (C="${@:+_}${@}" && echo "${C// /_}") ).conf"
+	echo "nanomq$([ "$#" -eq 1 ] && [ "${1}" = "*" ] && echo "*" || (C="${*:+_}${*}" && echo "${C// /_}") ).conf"
 }
 
 function search_conf {

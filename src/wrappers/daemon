@@ -9,4 +9,4 @@ if [ ! -r "${NANOMQ_CONF}" ]; then
 	exit 1
 fi
 
-exec $@
+exec "$@"

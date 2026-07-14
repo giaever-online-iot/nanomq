@@ -1,0 +1,40 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended"
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "managerFilePatterns": [
+        "/^snap/snapcraft\\.yaml$/"
+      ],
+      "matchStrings": [
+        "version: +?['\"]?(?<currentValue>[0-9][^'\"\\n]*)['\"]?"
+      ],
+      "depNameTemplate": "nanomq/nanomq",
+      "datasourceTemplate": "github-releases"
+    }
+  ],
+  "packageRules": [
+    {
+      "matchPackageNames": [
+        "nanomq/nanomq"
+      ],
+      "matchUpdateTypes": [
+        "major",
+        "minor",
+        "patch"
+      ],
+      "commitMessageTopic": "nanomq",
+      "labels": [
+        "dependencies",
+        "no-stale"
+      ],
+      "commitMessageExtra": "to {{newVersion}}",
+      "prBodyNotes": [
+        "This PR updates the version of NanoMQ in the snapcraft.yaml file to match the latest upstream GitHub release. Upstream tags are plain semver (no `v` prefix)."
+      ]
+    }
+  ]
+}
