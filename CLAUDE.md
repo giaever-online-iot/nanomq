@@ -32,21 +32,26 @@ for t in .github/scripts/*.test.sh; do bash "$t"; done   # CI helper unit tests
 shellcheck --severity=warning -x src/bin/* src/wrappers/* src/helpers/* tests/*.sh
 ```
 
-Note the naming split: `tests/` (plural) is the tracked test suite; the gitignored `test/` (singular) `SNAP`/`SNAP_DATA` trees mock the snap runtime so `src/bin/conf` can be exercised locally outside confinement (set `SNAP`, `NANOMQ_CONF`, `VIM`, `SNAP_UID=0`, `SNAP_INSTANCE_NAME` explicitly to mimic the snap environment).
+Note the naming split: `tests/` (plural) is the tracked test suite; the gitignored `test/` (singular) `SNAP`/`SNAP_DATA` trees mock the snap runtime so `src/bin/conf` can be exercised locally outside confinement (set `SNAP`, `NANOMQ_CONF`, `NANOMQ_VIMRC`, `SNAP_UID=0`, `SNAP_INSTANCE_NAME` explicitly to mimic the snap environment).
 
 ## Architecture
 
 ### snapcraft.yaml
 
-Three parts: `nanomq` (cmake build of upstream with TLS, SQLite, ACL, and rule engine enabled — the commented block at the bottom of the yaml catalogs all other available cmake flags), `local` (dumps `src/` into the snap and stages `vim-tiny`), and `crash` (a deliberate debugging hook: a nil part ordered after the others whose `override-prime` you flip to a failing command when you want `snapcraft --debug` to drop you into the build container after the real parts have built).
+Three parts: `nanomq` (cmake build of upstream with TLS, SQLite, ACL, rule engine, JWT, bench, and ZMQ gateway enabled — the commented block at the bottom of the yaml catalogs the remaining flags and why QUIC/DDS/vsomeip stay off), `local` (dumps `src/` into the snap and stages `vim-tiny`), and `crash` (a deliberate debugging hook: a nil part ordered after the others whose `override-prime` you flip to a failing command when you want `snapcraft --debug` to drop you into the build container after the real parts have built).
 
-Three snap apps are exposed:
+The `nanomq` part's `override-stage` rewrites upstream example configs to snap paths (logs/SQLite to `$SNAP_COMMON`, auth includes to `$SNAP_DATA`), comments out the `http_server` block in the default config (in HOCON, **block presence = REST API enabled**, and upstream ships admin/public credentials — a guard `grep` fails the build if upstream reshapes the block), and deletes the example configs of gateways that aren't compiled in (DDS, vsomeip).
 
-- `nanomq` — the broker daemon (`nanomq start --conf $NANOMQ_CONF`), wrapped by `src/wrappers/daemon` via command-chain; restarts always
-- `nanomq.cli` — upstream's `nanomq_cli`
+Hooks: `snap/hooks/install` seeds `$SNAP_DATA` with a working `nanomq.conf` (broker runs out of the box; REST API off) plus the password/ACL files, and creates `$SNAP_DATA/certs` + `$SNAP_COMMON/log`; `snap/hooks/post-refresh` repeats it (kept in sync) for installs that predate the hook. The `/etc/certs` layout maps to `$SNAP_DATA/certs` so users can drop TLS material at the path all example configs reference — it must never point into `$SNAP` (read-only, and upstream ships no certs).
+
+Four snap apps are exposed:
+
+- `nanomq` — the broker daemon (`nanomq start --conf $NANOMQ_CONF`), wrapped by `src/wrappers/daemon` via command-chain; restarts always (10 s delay)
+- `nanomq.cli` — upstream's `nanomq_cli` (pub, sub, conn, bench, rules, nngproxy, nngcat, zmq_gateway); has the `home` plug
 - `nanomq.conf` — `src/bin/conf`, an interactive config editor
+- `nanomq.help` — `src/bin/help`, a plain-text overview of the package's commands and paths
 
-`NANOMQ_CONF` is set snap-wide to `$SNAP_DATA/nanomq.conf`.
+`NANOMQ_CONF` is set snap-wide to `$SNAP_DATA/nanomq.conf`; the editor's vimrc path is `NANOMQ_VIMRC` (deliberately not `VIM`, which vim itself interprets as its runtime directory).
 
 ### The bash scripts (src/)
 
@@ -54,7 +59,9 @@ Three snap apps are exposed:
 
 `src/wrappers/daemon` gates daemon startup: it requires root and refuses to start (exit 1) until `$NANOMQ_CONF` exists, directing the user to run `sudo nanomq.conf`.
 
-`src/bin/conf` is the main UX: it lists writable configs from `$SNAP_DATA` and read-only examples from `$SNAP/usr/local/etc/`, copies a chosen read-only example into `$SNAP_DATA` (renaming `nanomq.conf` / `nanomq_old.conf` / `nanomq_example.conf` variants to the `$NANOMQ_CONF` basename, keeping other names like `nanomq_bridge.conf` as-is), opens it in `vim.tiny`, and on save restarts the daemon with `snapctl restart`.
+`src/bin/conf` is the main UX: it lists writable configs from `$SNAP_DATA` and read-only examples from `$SNAP/usr/local/etc/`, copies a chosen read-only example into `$SNAP_DATA` (renaming `nanomq.conf` / `nanomq_old.conf` / `nanomq_example.conf` variants to the `$NANOMQ_CONF` basename, keeping other names like `nanomq_bridge.conf` as-is), opens it in `vim.tiny`, and on save restarts the daemon with `snapctl restart`. Once `$NANOMQ_CONF` exists (always, post-seeding), a no-arg run targets just the active config — `sudo nanomq.conf "*"` lists everything.
+
+`src/bin/help` is self-contained on purpose (no `functions` sourcing, no root): it must work outside confinement, falling back to the real install's `/var/snap/...` paths when the snap env vars are absent (that's what `tests/help_test.sh` pins).
 
 ### Version bumps
 

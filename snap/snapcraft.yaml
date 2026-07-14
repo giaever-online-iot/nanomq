@@ -17,9 +17,11 @@ description: |
 
   For more information, please visit [NanoMQ homepage](https://nanomq.io/)
 grade: stable # must be 'stable' to release into candidate/stable channels
-confinement: strict # use 'strict' once you have the right plugs and slots
+confinement: strict
 website: https://nanomq.io/
 source-code: https://github.com/giaever-online-iot/nanomq
+contact: https://github.com/giaever-online-iot/nanomq/issues
+issues: https://github.com/giaever-online-iot/nanomq/issues
 license: MIT
 platforms:
   amd64:
@@ -30,7 +32,7 @@ platforms:
   riscv64:
 environment:
   NANOMQ_CONF: "$SNAP_DATA/nanomq.conf"
-  VIM: $SNAP_COMMON/vimrc
+  NANOMQ_VIMRC: $SNAP_COMMON/vimrc
 apps:
   nanomq:
     command: usr/local/bin/nanomq start --conf $NANOMQ_CONF
@@ -38,6 +40,7 @@ apps:
       - wrappers/daemon
     daemon: simple
     restart-condition: always
+    restart-delay: 10s
     plugs:
       - network
       - network-bind
@@ -46,20 +49,27 @@ apps:
     plugs:
       - network
       - network-bind
+      - home # lets pub/sub read cert/payload files from the user's home
   conf:
     command: bin/conf
+  help:
+    command: bin/help
 layout:
   /etc/vim/vimrc:
     bind-file: $SNAP_COMMON/vimrc
+  # Writable, so users can drop their own TLS material at the /etc/certs/...
+  # paths every example config references. Created by the install/post-refresh
+  # hooks. (Must NOT point into $SNAP: that is read-only, and upstream stopped
+  # shipping an etc/certs directory anyway.)
   /etc/certs:
-    symlink: $SNAP/usr/local/etc/certs
+    symlink: $SNAP_DATA/certs
 parts:
   nanomq:
     plugin: cmake
     source: https://github.com/nanomq/nanomq.git
     build-packages:
       - libmbedtls-dev
-      - libatomic1
+      - libzmq3-dev
       #- libmysqlclient-dev
       - pkg-config
     cmake-generator: Ninja
@@ -68,14 +78,47 @@ parts:
       - -DNNG_ENABLE_SQLITE=ON # Builds with SQLite support. Default is OFF.
       #- -DDEBUG=ON # Enables the debug flag. Default is OFF.
       - -DENABLE_ACL=ON # Enable ACL.
-      #- -DENABLE_JWT=ON # Builds JWT dependency for the HTTP server. Default is OFF.
+      - -DENABLE_JWT=ON # JWT auth for the REST API (vendored l8w8jwt submodule). Default is OFF.
       #- -DENABLE_MYSQL=ON # Enable MySQL. Requires=libmysqlclient-dev. Default is OFF.
       - -DENABLE_RULE_ENGINE=ON # Enable rule engine. Default is OFF.
-      - -DENABLE_SYSLOG=NO # Enable syslog.
+      - -DENABLE_SYSLOG=OFF # syslog is not reachable under strict confinement; stdout goes to journald.
+      - -DBUILD_BENCH=ON # `nanomq_cli bench` MQTT load-testing tool. Default is OFF.
+      - -DBUILD_ZMQ_GATEWAY=ON # `nanomq_cli zmq_gateway` (system libzmq). Default is OFF.
     stage-packages:
-      #- libmbedtls-dev
       - libmbedtls14t64
-      #- libmysqlclient21
+      - libzmq5
+    override-stage: |
+      craftctl default
+      # Upstream examples reference host paths that don't exist (or don't
+      # persist) inside the snap; rewrite them to their snap equivalents.
+      # /etc/certs/... paths are left alone — the layout maps them to
+      # $SNAP_DATA/certs, which the install hook creates.
+      sed -i \
+        -e 's|dir = "/tmp"|dir = "/var/snap/nanomq/common/log"|' \
+        -e 's|"/tmp/sqlite_rule.db"|"/var/snap/nanomq/common/sqlite_rule.db"|' \
+        -e 's|"/tmp/nanomq-parquet"|"/var/snap/nanomq/common/nanomq-parquet"|' \
+        -e 's|include "/etc/nanomq_pwd.conf"|include "/var/snap/nanomq/current/nanomq_pwd.conf"|' \
+        -e 's|include "/etc/nanomq_acl.conf"|include "/var/snap/nanomq/current/nanomq_acl.conf"|' \
+        "${CRAFT_STAGE}"/usr/local/etc/*.conf
+      # In the HOCON format the mere PRESENCE of an http_server block enables
+      # the REST API — and upstream's default carries admin/public credentials.
+      # Neutralize it in the default config (which the install hook seeds), and
+      # fail the build loudly if upstream reshapes the block so this stops matching.
+      sed -i \
+        -e '/^http_server {/i # NOTE (snap): the REST API is disabled by default — if this block is present' \
+        -e '/^http_server {/i # (uncommented) the HTTP server listens on :8081 with the credentials below.' \
+        -e '/^http_server {/i # Uncomment the block AND change the credentials to enable it.' \
+        -e '/^http_server {/,/^}/ s/^/# /' \
+        "${CRAFT_STAGE}/usr/local/etc/nanomq.conf"
+      grep -q '^# http_server {' "${CRAFT_STAGE}/usr/local/etc/nanomq.conf" || {
+        echo "override-stage: http_server block in nanomq.conf no longer matches — refusing to ship it enabled" >&2
+        exit 1
+      }
+      # These gateways are not compiled into this snap (heavy out-of-archive
+      # dependencies); shipping their examples would list dead options in the
+      # `nanomq.conf` picker.
+      rm -f "${CRAFT_STAGE}/usr/local/etc/nanomq_dds_gateway.conf" \
+            "${CRAFT_STAGE}/usr/local/etc/nanomq_vsomeip_gateway.conf"
     source-tag: $SNAPCRAFT_PROJECT_VERSION
   local:
     plugin: dump
@@ -95,25 +138,20 @@ parts:
 #
 #-DDEBUG=ON                   # Enables the debug flag. Default is OFF.
 #-DBUILD_NFTP=ON
-#-DNNG_ENABLE_QUIC=ON         # Enables the QUIC bridging. Requires=libmsquic. Default is OFF.
-#-DENABLE_AWS_BRIDGE=ON       # Enables the AWS IoT Core bridging. Can't co-exist with QUIC. Default is OFF.
-#-DNNG_ENABLE_TLS=ON          # Builds NanoMQ with TLS support. Requires [mbedtls](https://github.com/Mbed-TLS/mbedtls).
+#-DNNG_ENABLE_QUIC=ON         # MQTT-over-QUIC bridging. Left OFF: the vendored msquic
+#                             # does not build on s390x/riscv64/ppc64el, and QUIC
+#                             # excludes ENABLE_AWS_BRIDGE.
+#-DENABLE_AWS_BRIDGE=ON       # Enables the AWS IoT Core bridging. Can't co-exist with QUIC. Default is OFF.
 #-DBUILD_CLIENT=OFF           # Disables the client suite. Default is ON.
-#-DBUILD_ZMQ_GATEWAY=ON       # Builds with ZeroMQ gateway tool. Default is OFF.
-#-DBUILD_DDS_PROXY=ON         # Builds with DDS proxy. Default is OFF.
-#-DBUILD_VSOMEIP_GATEWAY      # Build vsomeip gateway.
+#-DBUILD_DDS_PROXY=ON         # Left OFF: needs CycloneDDS (not in the Ubuntu archive).
+#-DBUILD_VSOMEIP_GATEWAY      # Left OFF: needs COVESA vsomeip (not in the Ubuntu archive).
 #-DBUILD_NNG_PROXY            # Build nng proxy.
-#-DBUILD_BENCH=ON             # Builds with MQTT bench. Default is OFF.
-#-DENABLE_JWT=ON              # Builds JWT dependency for the HTTP server. Default is OFF.
 #-DBUILD_STATIC_LIB=ON        # Builds as a static library. Default is OFF.
 #-DBUILD_SHARED_LIBS=ON       # Builds as a shared library. Default is OFF.
 #-DASAN=ON                    # Enables sanitizer. Default is OFF.
 #-DNOLOG=1                    # Disable the log system. Default is OFF.
 #-DDEBUG_TRACE=ON             # Enables ptrace. Default is OFF.
-#-DENABLE_RULE_ENGINE=ON      # Enable rule engine. Default is OFF.
 #-DENABLE_MYSQL=ON            # Enable MySQL. Default is OFF.
-#-DENABLE_ACL                 # Enable ACL.
-#-DENABLE_SYSLOG              # Enable syslog.
 #
 # #################
 # Perfomance Tuning
@@ -131,5 +169,3 @@ parts:
 #-DNANO_QOS_LEN=64            # Set queue length for QoS message.
 #-DNANO_MSQ_LEN=64            # Set queue length for a resending message.
 #-DPARALLEL=32                # Set logical concurrency limitation.
-#stage-packages:
-#- libmsquic # If NNG_ENABLE_QUIC is ON

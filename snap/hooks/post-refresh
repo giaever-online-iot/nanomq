@@ -1,0 +1,8 @@
+#!/bin/sh -e
+# Same provisioning as hooks/install (kept in sync with it): the install hook
+# only runs on first install, so refreshes from revisions that predate it
+# would otherwise never get the seeded config, cert dir, or log dir.
+mkdir -p "$SNAP_DATA/certs" "$SNAP_COMMON/log"
+for f in nanomq.conf nanomq_pwd.conf nanomq_acl.conf; do
+	[ -e "$SNAP_DATA/$f" ] || cp "$SNAP/usr/local/etc/$f" "$SNAP_DATA/$f"
+done
