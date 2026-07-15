@@ -107,7 +107,11 @@ parts:
       - -DBUILD_ZMQ_GATEWAY=ON # `nanomq_cli zmq_gateway` (system libzmq). Default is OFF.
     stage-packages:
       - libmbedtls14t64
-    override-stage: |
+    # File surgery happens here, on CRAFT_PART_INSTALL, BEFORE the stage step:
+    # craft-parts records the part's file manifest when staging, so deleting or
+    # renaming staged files afterwards (e.g. in override-stage) breaks the
+    # stage->prime copy with "Failed to copy ...: no such file or directory".
+    override-build: |
       craftctl default
       # Upstream examples reference host paths that don't exist (or don't
       # persist) inside the snap; rewrite them to their snap equivalents.
@@ -119,7 +123,7 @@ parts:
         -e 's|"/tmp/nanomq-parquet"|"/var/snap/nanomq/common/nanomq-parquet"|' \
         -e 's|include "/etc/nanomq_pwd.conf"|include "/var/snap/nanomq/current/nanomq_pwd.conf"|' \
         -e 's|include "/etc/nanomq_acl.conf"|include "/var/snap/nanomq/current/nanomq_acl.conf"|' \
-        "${CRAFT_STAGE}"/usr/local/etc/*.conf
+        "${CRAFT_PART_INSTALL}"/usr/local/etc/*.conf
       # In the HOCON format the mere PRESENCE of an http_server block enables
       # the REST API — and upstream's default carries admin/public credentials.
       # Neutralize it in the default config (which the install hook seeds), and
@@ -129,16 +133,16 @@ parts:
         -e '/^http_server {/i # (uncommented) the HTTP server listens on :8081 with the credentials below.' \
         -e '/^http_server {/i # Uncomment the block AND change the credentials to enable it.' \
         -e '/^http_server {/,/^}/ s/^/# /' \
-        "${CRAFT_STAGE}/usr/local/etc/nanomq.conf"
-      grep -q '^# http_server {' "${CRAFT_STAGE}/usr/local/etc/nanomq.conf" || {
-        echo "override-stage: http_server block in nanomq.conf no longer matches — refusing to ship it enabled" >&2
+        "${CRAFT_PART_INSTALL}/usr/local/etc/nanomq.conf"
+      grep -q '^# http_server {' "${CRAFT_PART_INSTALL}/usr/local/etc/nanomq.conf" || {
+        echo "override-build: http_server block in nanomq.conf no longer matches — refusing to ship it enabled" >&2
         exit 1
       }
       # These gateways are not compiled into this snap (heavy out-of-archive
       # dependencies); shipping their examples would list dead options in the
       # `nanomq.conf` picker.
-      rm -f "${CRAFT_STAGE}/usr/local/etc/nanomq_dds_gateway.conf" \
-            "${CRAFT_STAGE}/usr/local/etc/nanomq_vsomeip_gateway.conf"
+      rm -f "${CRAFT_PART_INSTALL}/usr/local/etc/nanomq_dds_gateway.conf" \
+            "${CRAFT_PART_INSTALL}/usr/local/etc/nanomq_vsomeip_gateway.conf"
     source-tag: $SNAPCRAFT_PROJECT_VERSION
   local:
     plugin: dump
