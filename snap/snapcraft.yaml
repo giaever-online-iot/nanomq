@@ -64,16 +64,37 @@ layout:
   /etc/certs:
     symlink: $SNAP_DATA/certs
 parts:
+  # nanomq_cli's ZMQ gateway locates ZeroMQ with a CONFIG-mode
+  # find_package(ZeroMQ REQUIRED) — it needs ZeroMQConfig.cmake, which Ubuntu's
+  # autotools-packaged libzmq3-dev does NOT ship (pkg-config only). Build the
+  # same upstream version noble packages, whose CMake install provides the
+  # config; only the runtime library is primed into the snap.
+  libzmq:
+    plugin: cmake
+    source: https://github.com/zeromq/libzmq.git
+    source-tag: v4.3.5
+    cmake-generator: Ninja
+    cmake-parameters:
+      - -DCMAKE_INSTALL_PREFIX=/usr
+      - -DWITH_DOCS=OFF
+      - -DBUILD_TESTS=OFF
+      - -DENABLE_DRAFTS=OFF
+      - -DWITH_PERF_TOOL=OFF
+      - -DBUILD_STATIC=OFF
+    prime:
+      - usr/lib/libzmq.so.5*
   nanomq:
+    after: [libzmq]
     plugin: cmake
     source: https://github.com/nanomq/nanomq.git
     build-packages:
       - libmbedtls-dev
-      - libzmq3-dev
       #- libmysqlclient-dev
       - pkg-config
     cmake-generator: Ninja
     cmake-parameters:
+      # Finds the staged libzmq's ZeroMQConfig.cmake (see the libzmq part).
+      - -DCMAKE_PREFIX_PATH=${CRAFT_STAGE}/usr
       - -DNNG_ENABLE_TLS=ON # Builds NanoMQ with TLS support. Requires [mbedtls](https://github.com/Mbed-TLS/mbedtls).
       - -DNNG_ENABLE_SQLITE=ON # Builds with SQLite support. Default is OFF.
       #- -DDEBUG=ON # Enables the debug flag. Default is OFF.
@@ -86,7 +107,6 @@ parts:
       - -DBUILD_ZMQ_GATEWAY=ON # `nanomq_cli zmq_gateway` (system libzmq). Default is OFF.
     stage-packages:
       - libmbedtls14t64
-      - libzmq5
     override-stage: |
       craftctl default
       # Upstream examples reference host paths that don't exist (or don't
