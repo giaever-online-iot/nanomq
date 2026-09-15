@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# Plain-text overview of everything this snap ships. Needs no root and no
+# snap runtime: outside confinement the paths fall back to the defaults a
+# real install would have, so this stays testable (see tests/help_test.sh).
+
+INSTANCE="${SNAP_INSTANCE_NAME:-nanomq}"
+DATA="${SNAP_DATA:-/var/snap/${INSTANCE}/current}"
+COMMON="${SNAP_COMMON:-/var/snap/${INSTANCE}/common}"
+
+cat <<EOF
+NanoMQ snap — command overview
+==============================
+
+Service
+  ${INSTANCE}                    The MQTT broker daemon. Out of the box it listens on
+                            :1883 (MQTT) and :8083 (MQTT over WebSocket).
+                              sudo snap start|stop|restart ${INSTANCE}
+                              sudo snap logs ${INSTANCE}
+                            File log: ${COMMON}/log
+
+Commands
+  ${INSTANCE}.cli                MQTT client toolbox — pub, sub, conn, bench, rules,
+                            nngproxy, nngcat, zmq_gateway. Each has --help, e.g.:
+                              ${INSTANCE}.cli sub --help
+  sudo ${INSTANCE}.conf          Interactive configuration editor: pick a config, edit
+                            it in vim, and the broker restarts when you save.
+                            With no arguments it opens the active config; list
+                            every example with:
+                              sudo ${INSTANCE}.conf "*"
+                            Names follow nanomq[_<name>].conf, so e.g.
+                            'sudo ${INSTANCE}.conf bridge' targets nanomq_bridge.conf.
+  ${INSTANCE}.help               This overview.
+
+Configuration files
+  Active config             ${DATA}/nanomq.conf (seeded on install)
+  Password / ACL            ${DATA}/nanomq_pwd.conf and ${DATA}/nanomq_acl.conf —
+                            referenced from the auth section of the config.
+  TLS certificates          Put yours under ${DATA}/certs — the configs refer to
+                            them as /etc/certs/... (mapped there inside the snap).
+
+REST API
+  Disabled by default. To enable it, run 'sudo ${INSTANCE}.conf', uncomment the
+  http_server block and CHANGE its default credentials, then save.
+EOF

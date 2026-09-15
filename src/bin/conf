@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
-export VIM="${VIM:-"$(pwd)/test/SNAP/vimrc"}"
+# NANOMQ_VIMRC, not VIM: vim treats $VIM as its runtime *directory*, so using
+# it for a file path would misdirect vim's own runtime lookup.
+export NANOMQ_VIMRC="${NANOMQ_VIMRC:-"$(pwd)/test/SNAP/vimrc"}"
 export SNAP_UID="${SNAP_UID:-0}"
 
 . "${SNAP:-"$(pwd)/src"}/helpers/functions"
@@ -8,14 +10,14 @@ export SNAP_UID="${SNAP_UID:-0}"
 ensure_root
 cd "${SNAP:-"$(pwd)/src"}" || exit
 
-if [ ! -e "${VIM}" ] || [ ! -s "${VIM}" ]; then
-	logp "Creating: ${VIM}"
-	echo -e "set nocompatible\nset number\nset tabstop=4\nset autoindent" > $VIM
+if [ ! -e "${NANOMQ_VIMRC}" ] || [ ! -s "${NANOMQ_VIMRC}" ]; then
+	logp "Creating: ${NANOMQ_VIMRC}"
+	echo -e "set nocompatible\nset number\nset tabstop=4\nset autoindent" > "${NANOMQ_VIMRC}"
 fi
 
 function edit {
 	if [ -a "${1}" ]; then
-		$SNAP/usr/bin/vim.tiny -u "${VIM}" "${1}" && echo "Restarting ${SNAP_INSTANCE_NAME}" && snapctl restart "${SNAP_INSTANCE_NAME}.${SNAP_NAME}" && exit $?
+		$SNAP/usr/bin/vim.tiny -u "${NANOMQ_VIMRC}" "${1}" && echo "Restarting ${SNAP_INSTANCE_NAME}" && snapctl restart "${SNAP_INSTANCE_NAME}.${SNAP_NAME}" && exit $?
 	fi
 	exit $?
 }

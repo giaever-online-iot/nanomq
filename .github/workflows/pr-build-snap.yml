@@ -177,7 +177,13 @@ jobs:
         if: ${{ always() && steps.build.outputs.snaps == '0' }}
         run: |
           shopt -s nullglob
-          logs=( ~/.local/state/snapcraft/log/*.log ~/.cache/snapcraft/log/*.log )
+          # Include ./snapcraft-*.txt: that's the LAUNCHPAD BUILDER log snapcraft
+          # fetches into the workspace ("Log files:" in its output) — the only
+          # place the actual compile error lives. The state-dir logs are just
+          # snapcraft's own orchestration, and the Launchpad recipe (and with it
+          # the log's URL) is deleted right after the run, so if we don't upload
+          # it here it is gone.
+          logs=( ~/.local/state/snapcraft/log/*.log ~/.cache/snapcraft/log/*.log ./snapcraft-*.txt )
           out="${RUNNER_TEMP}/buildlog-${{ matrix.arch }}.txt"; : > "$out"
           if [ ${#logs[@]} -eq 0 ]; then
             echo "(no snapcraft log files found for ${{ matrix.arch }})" >> "$out"

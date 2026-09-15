@@ -1,0 +1,12 @@
+#!/bin/sh -e
+# Fresh-install provisioning, so the broker works out of the box:
+#  - $SNAP_DATA/certs   backs the /etc/certs layout (user TLS material)
+#  - $SNAP_COMMON/log   is where the shipped configs point the file log
+#  - a default nanomq.conf (MQTT :1883, WS :8083, REST API commented out —
+#    see `nanomq.help`), plus the password/ACL files the examples include.
+# Existing files are never overwritten. Keep in sync with hooks/post-refresh,
+# which repeats this for installs that predate this hook.
+mkdir -p "$SNAP_DATA/certs" "$SNAP_COMMON/log"
+for f in nanomq.conf nanomq_pwd.conf nanomq_acl.conf; do
+	[ -e "$SNAP_DATA/$f" ] || cp "$SNAP/usr/local/etc/$f" "$SNAP_DATA/$f"
+done
